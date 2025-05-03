@@ -1,19 +1,38 @@
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 
-void enableRAWMode() {
-    struct termios raw;
-    tcgetattr(STDIN_FILENO, &raw);
+struct termios orig_termios;
 
-    raw.c_lflag &= ~(ECHO);
+void disableRAWMode() {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enableRAWMode() {
+    tcgetattr(STDERR_FILENO, &orig_termios);
+    atexit(disableRAWMode);
+
+    struct termios raw = orig_termios;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_iflag &= ~(OPOST);
+    raw.c_cflag |= ~(CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
 
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-    
 }
 
 int main() {
     enableRAWMode();
     char c;
-    while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q');
+    while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
+        if (iscntrl(c)) {
+            printf("%d\n", c);
+        } else {
+            printf("%d (%c)\r\n", c, c);
+        }
+        
+    }
     return 0;
 }
